@@ -19,7 +19,7 @@ import java.util.regex.Pattern
 class DNSUpdater(
     private val settings: Settings
 ) {
-    var httpClient = HttpClient.newHttpClient()
+    private var httpClient = HttpClient.newHttpClient()
 
     fun checkAndUpdateDNSEntries() {
         // read ip from file
