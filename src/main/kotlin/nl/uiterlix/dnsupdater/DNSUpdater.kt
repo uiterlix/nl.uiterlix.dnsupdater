@@ -15,7 +15,6 @@ import java.nio.file.Files
 import java.nio.file.Paths
 import java.util.*
 import java.util.regex.Pattern
-import java.util.stream.Collectors
 
 class DNSUpdater(
     private val settings: Settings
@@ -167,13 +166,9 @@ class DNSUpdater(
         }
 
     private fun mapToURLEncodedString(parameters: Map<String, String>): String {
-        return parameters.entries.stream()
-            .map { (key, value): Map.Entry<String, String> ->
-                key + "=" + URLEncoder.encode(
-                    value
-                )
-            }
-            .collect(Collectors.joining("&"))
+        return parameters.entries.joinToString("&") { (key, value) ->
+            "${key}=${URLEncoder.encode(value, Charsets.UTF_8.toString())}"
+        }
     }
 
     private fun notifyViaMqtt(oldIp: String, newIp: String) {
