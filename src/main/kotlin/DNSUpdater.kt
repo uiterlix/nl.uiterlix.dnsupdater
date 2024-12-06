@@ -1,9 +1,11 @@
 import kotlinx.serialization.json.Json
+import java.io.File
 import java.io.IOException
 import java.net.URI
 import java.net.URLEncoder
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
+import java.net.http.HttpRequest.BodyPublishers
 import java.net.http.HttpResponse
 import java.nio.file.Files
 import java.nio.file.Paths
@@ -17,13 +19,33 @@ class DNSUpdater(
     var httpClient = HttpClient.newHttpClient()
 
     fun checkAndUpdateDNSEntries() {
+        // read ip from file
+        var storedIp: String? = null
+        val ipFile = File("external_ip.txt")
         val externalIP = externalIp
         println("Current external IP address: $externalIP")
-        val ipPattern = Pattern.compile("^((25[0-5]|(2[0-4]|1\\d|[1-9]|)\\d)\\.?\\b){4}$")
-        val ipMatcher = ipPattern.matcher(externalIP)
-        if (!ipMatcher.matches()) {
-            println("Did not get a valid external IP. Exiting.")
-            System.exit(-1)
+
+        // ip changed, replace
+        if (ipFile.exists()) {
+            storedIp = try {
+                Files.readString(ipFile.toPath())
+            } catch (e: IOException) {
+                throw RuntimeException(e)
+            }
+        }
+        if (externalIP == storedIp && isValidIP(externalIP)) {
+            println("IP address has not changed. Exiting.")
+            return
+        }
+
+        notifyIPAddressChange(storedIp ?: "", externalIP)
+
+        // store the ip
+        try {
+            ipFile.delete()
+            Files.writeString(ipFile.toPath(), externalIP)
+        } catch (e: IOException) {
+            throw RuntimeException(e)
         }
         val currentDNSIPs = currentARecordIp
         for (subdomain in settings.subDomains) {
@@ -39,6 +61,10 @@ class DNSUpdater(
                 println("IP is already up to date.")
             }
         }
+    }
+
+    private fun isValidIP(ip: String): Boolean {
+        return IP_PATTERN.matcher(ip).matches()
     }
 
     fun deleteRecord(name: String?) {
@@ -148,7 +174,30 @@ class DNSUpdater(
             .collect(Collectors.joining("&"))
     }
 
+    private fun notifyIPAddressChange(oldIp: String, newIp: String) {
+        val url = "http://192.168.2.91:6335/telegram_urgent"
+        val requestBody = "IP address changed from $oldIp to $newIp."
+        val request = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("Content-Type", "text/plain")
+            .POST(BodyPublishers.ofString(requestBody))
+            .version(HttpClient.Version.HTTP_1_1)
+            .build()
+
+        try {
+            val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+            println("Response from telegram_urgent: ${response.body()}")
+        } catch (e: IOException) {
+            throw RuntimeException(e)
+        } catch (e: InterruptedException) {
+            throw RuntimeException(e)
+        }
+    }
+
     companion object {
+        private val IP_PATTERN =
+            Pattern.compile("^(([01]?\\d\\d?|2[0-4]\\d|25[0-5])\\.){3}([01]?\\d\\d?|2[0-4]\\d|25[0-5])$")
+
         @JvmStatic
         fun main(args: Array<String>) {
             if (args.isEmpty()) {
