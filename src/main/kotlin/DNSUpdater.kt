@@ -1,11 +1,13 @@
 import kotlinx.serialization.json.Json
+import org.eclipse.paho.client.mqttv3.MqttClient
+import org.eclipse.paho.client.mqttv3.MqttMessage
+import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
 import java.io.File
 import java.io.IOException
 import java.net.URI
 import java.net.URLEncoder
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
-import java.net.http.HttpRequest.BodyPublishers
 import java.net.http.HttpResponse
 import java.nio.file.Files
 import java.nio.file.Paths
@@ -38,7 +40,7 @@ class DNSUpdater(
             return
         }
 
-        notifyIPAddressChange(storedIp ?: "", externalIP)
+        notifyViaMqtt(storedIp ?: "", externalIP)
 
         // store the ip
         try {
@@ -174,22 +176,22 @@ class DNSUpdater(
             .collect(Collectors.joining("&"))
     }
 
-    private fun notifyIPAddressChange(oldIp: String, newIp: String) {
-        val url = "http://192.168.2.91:6335/telegram_urgent"
-        val requestBody = "IP address changed from $oldIp to $newIp."
-        val request = HttpRequest.newBuilder()
-            .uri(URI.create(url))
-            .header("Content-Type", "text/plain")
-            .POST(BodyPublishers.ofString(requestBody))
-            .version(HttpClient.Version.HTTP_1_1)
-            .build()
+    private fun notifyViaMqtt(oldIp: String, newIp: String) {
+        val broker = "tcp://${settings.mqttHost}:${settings.mqttPort}"
+        val clientId = MqttClient.generateClientId()
+        val topic = settings.mqttTopic
+        val content = "IP address changed from $oldIp to $newIp."
 
         try {
-            val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-            println("Response from telegram_urgent: ${response.body()}")
-        } catch (e: IOException) {
-            throw RuntimeException(e)
-        } catch (e: InterruptedException) {
+            val client = MqttClient(broker, clientId, MemoryPersistence())
+            client.connect()
+            val message = MqttMessage(content.toByteArray())
+            message.qos = 2
+            client.publish(topic, message)
+            client.disconnect()
+            println("Message sent to MQTT topic $topic: $content")
+        } catch (e: Exception) {
+            println("Error sending MQTT message: ${e.message}")
             throw RuntimeException(e)
         }
     }
