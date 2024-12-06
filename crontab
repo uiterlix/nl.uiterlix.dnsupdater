@@ -1,0 +1,2 @@
+# Run the DNSUpdater every 5 minutes
+*/5 * * * * /usr/local/openjdk-19/bin/java -jar /app/build/libs/DNSUpdater.jar /config/settings.json >> /var/log/cron.log 2>&1

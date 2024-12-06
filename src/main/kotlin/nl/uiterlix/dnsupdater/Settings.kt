@@ -1,3 +1,5 @@
+package nl.uiterlix.dnsupdater
+
 import kotlinx.serialization.Serializable
 
 @Serializable

@@ -1,3 +1,5 @@
+package nl.uiterlix.dnsupdater
+
 import kotlinx.serialization.json.Json
 import org.eclipse.paho.client.mqttv3.MqttClient
 import org.eclipse.paho.client.mqttv3.MqttMessage
@@ -72,7 +74,7 @@ class DNSUpdater(
     fun deleteRecord(name: String?) {
         val parameters = java.util.Map.of(
             "domain", settings.domain,
-            "arecs0", "name=%s".formatted(name),
+            "arecs0", "name=${name}",
             "delete", "Delete Selected",
             "action", "select"
         )
@@ -94,13 +96,13 @@ class DNSUpdater(
     }
 
     private val currentRecords: String
-        private get() {
+        get() {
             val request = buildHttpGETRequest()
             val response = executeRequest(request)
             return response.body()
         }
 
-    val currentARecordIp: Map<String, String>
+    private val currentARecordIp: Map<String, String>
         get() {
             val result: MutableMap<String, String> = HashMap()
             val pattern = Pattern.compile("([a-z]*)\\t600\\tIN\\tA\\t(\\d+.\\d+.\\d+.\\d+)")
@@ -118,7 +120,6 @@ class DNSUpdater(
         }
 
     private fun executeRequest(request: HttpRequest): HttpResponse<String> {
-        val response: HttpResponse<String>? = null
         return try {
             httpClient.send(request, HttpResponse.BodyHandlers.ofString())
         } catch (e: IOException) {
@@ -142,17 +143,16 @@ class DNSUpdater(
 
     private fun buildHttpRequest(): HttpRequest.Builder {
         val token =
-            String(Base64.getEncoder().encode("%s:%s".formatted(settings.user, settings.password).toByteArray()))
-        val urlString = "https://%s:%d/CMD_API_DNS_CONTROL?domain=%s"
-            .formatted(settings.host, settings.port, settings.domain)
+            String(Base64.getEncoder().encode("${settings.user}:${settings.password}".toByteArray()))
+        val urlString = "https://${settings.host}:${settings.port}/CMD_API_DNS_CONTROL?domain=${settings.domain}"
         return HttpRequest.newBuilder(URI.create(urlString))
-            .header("Authorization", "Basic %s".formatted(token))
+            .header("Authorization", "Basic ${token}")
             .header("Content-Type", "application/x-www-form-urlencoded")
             .header("Accept", "*/*")
     }
 
     private val externalIp: String
-        private get() {
+        get() {
             val request = HttpRequest.newBuilder(URI.create("https://checkip.amazonaws.com/"))
                 .GET()
                 .build()
