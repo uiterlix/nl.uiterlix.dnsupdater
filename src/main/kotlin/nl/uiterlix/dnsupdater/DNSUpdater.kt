@@ -55,14 +55,14 @@ class DNSUpdater(
         for (subdomain in settings.subDomains) {
             val currentDNSIP = currentDNSIPs[subdomain]
                 ?: throw IllegalArgumentException("Could not find current ip for subdomain: $subdomain")
-            System.out.printf("Current IP of %s in DNS: %s%n", subdomain, currentDNSIP)
+            LOGGER.info("Current IP of subdomain $subdomain in DNS: $currentDNSIP")
             if (currentDNSIP != externalIP) {
-                LOGGER.info("Deleting current A record")
+                LOGGER.info("Deleting current A record for subdomain $subdomain")
                 deleteRecord(subdomain)
-                LOGGER.info("Recreating A record")
+                LOGGER.info("Recreating A record for subdomain $subdomain with new IP $externalIP")
                 addRecord(subdomain, externalIP)
             } else {
-                LOGGER.info("IP is already up to date.")
+                LOGGER.info("IP for subdomain $subdomain is already up to date.")
             }
         }
     }

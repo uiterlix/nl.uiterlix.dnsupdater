@@ -2,3 +2,4 @@ settings.json
 build/*
 .idea/*
 .gradle/*
+external_ip.txt
