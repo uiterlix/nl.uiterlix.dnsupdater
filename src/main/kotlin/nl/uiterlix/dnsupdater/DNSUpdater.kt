@@ -4,6 +4,7 @@ import kotlinx.serialization.json.Json
 import org.eclipse.paho.client.mqttv3.MqttClient
 import org.eclipse.paho.client.mqttv3.MqttMessage
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
+import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.IOException
 import java.net.URI
@@ -26,7 +27,7 @@ class DNSUpdater(
         var storedIp: String? = null
         val ipFile = File("external_ip.txt")
         val externalIP = externalIp
-        println("Current external IP address: $externalIP")
+        LOGGER.info("Current external IP address: $externalIP")
 
         // ip changed, replace
         if (ipFile.exists()) {
@@ -37,7 +38,7 @@ class DNSUpdater(
             }
         }
         if (externalIP == storedIp && isValidIP(externalIP)) {
-            println("IP address has not changed. Exiting.")
+            LOGGER.info("IP address has not changed. Exiting.")
             return
         }
 
@@ -56,12 +57,12 @@ class DNSUpdater(
                 ?: throw IllegalArgumentException("Could not find current ip for subdomain: $subdomain")
             System.out.printf("Current IP of %s in DNS: %s%n", subdomain, currentDNSIP)
             if (currentDNSIP != externalIP) {
-                println("Deleting current A record")
+                LOGGER.info("Deleting current A record")
                 deleteRecord(subdomain)
-                println("Recreating A record")
+                LOGGER.info("Recreating A record")
                 addRecord(subdomain, externalIP)
             } else {
-                println("IP is already up to date.")
+                LOGGER.info("IP is already up to date.")
             }
         }
     }
@@ -184,9 +185,9 @@ class DNSUpdater(
             message.qos = 2
             client.publish(topic, message)
             client.disconnect()
-            println("Message sent to MQTT topic $topic: $content")
+            LOGGER.info("Message sent to MQTT topic $topic: $content")
         } catch (e: Exception) {
-            println("Error sending MQTT message: ${e.message}")
+            LOGGER.error("Error sending MQTT message: ${e.message}")
             throw RuntimeException(e)
         }
     }
@@ -194,18 +195,19 @@ class DNSUpdater(
     companion object {
         private val IP_PATTERN =
             Pattern.compile("^(([01]?\\d\\d?|2[0-4]\\d|25[0-5])\\.){3}([01]?\\d\\d?|2[0-4]\\d|25[0-5])$")
+        private val LOGGER = LoggerFactory.getLogger(DNSUpdater::class.java)
 
         @JvmStatic
         fun main(args: Array<String>) {
             if (args.isEmpty()) {
-                println("Please provide the absolute file location for settings.json as an argument.")
+                LOGGER.error("Please provide the absolute file location for settings.json as an argument.")
                 return
             }
 
             val filePath = args[0]
             val jsonString = Files.readString(Paths.get(filePath))
             val settings = Json.decodeFromString<Settings>(jsonString)
-            println(settings)
+            LOGGER.info("Read settings for domain ${settings.domain} and subdomains ${settings.subDomains}")
             val updater = DNSUpdater(settings)
             updater.checkAndUpdateDNSEntries()
         }
